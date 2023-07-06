@@ -33,15 +33,14 @@ struct BitmapInfoHeader {
 
 class Image {
 	private:
-	class 				Pixel;						// Pixel class prototype
 	char 				signature[3];
 	BitmapFileHeader    fileHeader;
 	BitmapInfoHeader	infoHeader;
 	std::ifstream 		file;						// File contain image data
-	Pixel *		pixels;						// Container for pixel array, include R, G, B value.
 	std::string 		label;						// Label for image for classification
 	std::string 		path;						// Path to the image location
 	int 				imageID;					// Image ID
+	std::vector<std::vector<int>>	pixels;			// Container for pixel array, include R, G, B value.
 	public:
 	Image() {}																	// Default constructor
 	Image(std::string _path, int _imageID);	  									// Constructor with image path and load image}
@@ -51,25 +50,9 @@ class Image {
 	void getImageInfo();
 	void hexdump();
 	void testing();
-	int calculatePadding(int width, int bytesPerPixel);
+	int convertGrayScale(int pixel);
 
 	private:
-	class Pixel {
-		friend class Image;
-		uint8_t R;
-		uint8_t G;
-		uint8_t B;
-		public:
-		Pixel() {};
-		Pixel(uint8_t r, uint8_t g, uint8_t b) : R(r), G(g), B(b) {}
-		int group () {
-			return 0x00FFFFFF & ((std::uint32_t)B | ((std::uint32_t)G << 8) | (std::uint32_t)R << 16);
-		}
-		int toGreyScale() {
-			return std::round(float(int(R) +int(G) + int(B)) / 3);
-		}
-	};
-	
 	class UnsupportedFormat : public std::exception {
 		friend class Image;
 		std::string msg;

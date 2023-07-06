@@ -7,7 +7,6 @@ Image::Image(std::string _path, int _imageID) : path(_path), imageID(_imageID) {
 }
 
 Image::~Image(){
-	delete [] pixels;
 }
 
 void Image::getHeaderInfo() {
@@ -24,19 +23,10 @@ void Image::getImageInfo() {
 	std::cout << "Image size: " 		<< this -> infoHeader.imageSize 	 << std::endl;
 }
 
-int Image::calculatePadding(int width, int bytesPerPixel) {
-	int bytesPerRow = width * bytesPerPixel;
-	int padding = 0;
-	if (bytesPerRow % 4 != 0) {
-		padding = 4 - (bytesPerRow % 4);
-	}
-	return padding;
-}
-
 void Image::hexdump(){
 	for(int i = 0; i < this -> infoHeader.width; i++){
 		for(int j = 0; j < this -> infoHeader.height; j++){
-			std::cout << std::hex << pixels[i * this -> infoHeader.width + j].group() << " ";
+			std::cout << std::hex << pixels[i][j] << " ";
 		}
 		std::cout << std::endl;
 	}
@@ -44,14 +34,21 @@ void Image::hexdump(){
 
 void Image::testing(){
 	const std::string table = " .:-=+*#%@";
-	for(int i = 0; i < this -> infoHeader.height; i++){
-		for(int j = 0; j < this -> infoHeader.width; j++){
-			int idx = pixels[i * this -> infoHeader.width + j].toGreyScale();
+	for(std::int32_t i = 0; i < this -> infoHeader.height; i++){
+		for(std::int32_t j = 0; j < this -> infoHeader.width; j++){
+			int32_t idx = convertGrayScale(pixels[i][j]);
 			idx = std::round((float(idx) / 255) * 9);
 			std::cout << table[idx] << table[idx];
 		}
 		std::cout << std::endl;
 	}
+}
+
+int Image::convertGrayScale(int pixel){
+	int blue = pixel & 0xff;
+	int green = (pixel >> 8) & 0xff;
+	int red = (pixel >> 16) & 0xff;
+	return std::round(float(blue + green + red) / 3);
 }
 
 void Image::loadImageData() {
@@ -72,26 +69,27 @@ void Image::loadImageData() {
 				
 				//loading image pixels dat
 				this -> file.seekg(this -> fileHeader.dataOffset, std::ios::beg);
-				this -> pixels = new Pixel[this -> infoHeader.width * this -> infoHeader.height];
-
-				int padding = calculatePadding(this -> infoHeader.width, this -> infoHeader.bitsPerPixel);
 				int bytesPerPixel = this -> infoHeader.bitsPerPixel / 8;
+				int padding = (4 - ((this -> infoHeader.width * bytesPerPixel) % 4)) % 4;
 
-				char * rowBuffer = new char[this ->  infoHeader.width * bytesPerPixel + padding];
+				//Loading the entire image pixels data into Buffer
+				char * Buffer = new char[this -> infoHeader.imageSize];
+				file.read(Buffer, this -> infoHeader.imageSize);
+				std::vector<std::vector<int>> _pixels(this -> infoHeader.height, std::vector<int>(this -> infoHeader.width));
+
+				int dataIndex = 0;
 				for (int i = this -> infoHeader.height - 1; i >= 0; i--) {
-					this -> file.read(rowBuffer, this ->  infoHeader.width * bytesPerPixel + padding);
 					for (int j = 0; j < this -> infoHeader.width; j++) {
 						int offset = j * bytesPerPixel;
-						int blue = rowBuffer[offset] & 0xFF;
-						int green = rowBuffer[offset + 1] & 0xFF;
-						int red = rowBuffer[offset + 2] & 0xFF;
-						pixels[i * this -> infoHeader.width + j].R = (std::uint8_t)red;
-						pixels[i * this -> infoHeader.width + j].G = (std::uint8_t)green;
-						pixels[i * this -> infoHeader.width + j].B = (std::uint8_t)blue;
-						std::cout << red << " " << green << " " << blue << std::endl;
+						int blue = Buffer[dataIndex + offset] & 0xFF;
+						int green = Buffer[dataIndex + offset + 1] & 0xFF;
+						int red = Buffer[dataIndex + offset+ 2] & 0xFF;
+						_pixels[i][j] = (red << 16) | (green << 8) | blue;
 					}
+					dataIndex +=  bytesPerPixel * this -> infoHeader.width + padding;
 				}
-				delete [] rowBuffer;
+				this -> pixels = _pixels;
+				delete [] Buffer;
 				// Close the file when finished
 				file.close();
 			}
